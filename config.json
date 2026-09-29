@@ -1,0 +1,18 @@
+{
+    "user_name": "Ketan",
+    "default_city": "Jaipur",
+    "confirm_dangerous": true,
+    "whatsapp_load_seconds": 12,
+    "shutdown_delay_seconds": 15,
+    "listen_timeout": 5,
+    "phrase_limit": 8,
+    "wake_word_enabled": true,
+    "wake_words": ["hello assistant", "hey assistant", "wake up assistant"],
+    "language": "hi-IN",
+    "ai_model": "claude-3-5-haiku-20241022",
+    "ai_fallback": false,
+    "contacts": {
+        "rahul": "rahul@example.com",
+        "mummy": "mummy@example.com"
+    }
+}
