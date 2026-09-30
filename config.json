@@ -3,7 +3,7 @@
     "default_city": "Jaipur",
     "confirm_dangerous": true,
     "whatsapp_load_seconds": 12,
-    "shutdown_delay_seconds": 15,
+    "shutdown_delay_seconds": 10,
     "listen_timeout": 5,
     "phrase_limit": 8,
     "wake_word_enabled": true,

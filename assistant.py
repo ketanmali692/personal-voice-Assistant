@@ -1,25 +1,7 @@
 """
-Personal Voice Assistant (Windows) - Final Version
-====================================================
-Features:
-    - Voice commands (Hindi + English + Hinglish)
-    - AI fallback (Claude) for unknown questions (optional)
-    - Wake word detection
-    - Exit/Hello toggle (assistant pause/resume)
-    - Logging to file
-    - GUI (Tkinter) with status and controls
-    - Weather, Wikipedia, Email, WhatsApp, Camera, Screenshots
-
-Install:
-    pip install -r requirements.txt
-
-Environment Variables (optional, for AI + Email):
-    setx ANTHROPIC_API_KEY "your-claude-api-key"
-    setx ASSISTANT_EMAIL "yourname@gmail.com"
-    setx ASSISTANT_EMAIL_PASSWORD "your-16-letter-gmail-app-password"
-
-Run:
-    python assistant.py
+Personal Voice Assistant (Windows) - Final Working Version
+============================================================
+All commands are flexible. Whatever you say, it will work.
 """
 
 import datetime
@@ -63,7 +45,7 @@ except ImportError:
 
 
 # ==================================================
-# LOGGING SETUP
+# LOGGING
 # ==================================================
 
 LOG_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
@@ -82,7 +64,7 @@ log = logging.getLogger("assistant")
 
 
 # ==================================================
-# CONFIG LOADER
+# CONFIG
 # ==================================================
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
@@ -93,16 +75,14 @@ DEFAULT_CONFIG = {
     "confirm_dangerous": True,
     "whatsapp_load_seconds": 12,
     "shutdown_delay_seconds": 15,
-    "listen_timeout": 5,
-    "phrase_limit": 8,
+    "listen_timeout": 7,
+    "phrase_limit": 10,
     "wake_word_enabled": True,
     "wake_words": ["hello assistant", "hey assistant", "wake up assistant"],
-    "language": "hi-IN",
     "ai_model": "claude-3-5-haiku-20241022",
     "ai_fallback": False,
     "contacts": {
         "rahul": "rahul@example.com",
-        "mummy": "mummy@example.com",
     },
 }
 
@@ -112,16 +92,12 @@ def load_config():
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 user_config = json.load(f)
-            cfg = {**DEFAULT_CONFIG, **user_config}
-            log.info("Config loaded from config.json")
-            return cfg
+            return {**DEFAULT_CONFIG, **user_config}
         except Exception as e:
-            log.error(f"Config load failed: {e}. Using defaults.")
+            log.error(f"Config load failed: {e}")
     else:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(DEFAULT_CONFIG, f, indent=4)
-        log.info("config.json created with defaults.")
-
     return DEFAULT_CONFIG.copy()
 
 
@@ -134,17 +110,14 @@ SHUTDOWN_DELAY_SECONDS = CONFIG["shutdown_delay_seconds"]
 LISTEN_TIMEOUT = CONFIG["listen_timeout"]
 PHRASE_LIMIT = CONFIG["phrase_limit"]
 DEFAULT_CITY = CONFIG["default_city"]
-WAKE_WORD_ENABLED = CONFIG["wake_word_enabled"]
 WAKE_WORDS = [w.lower() for w in CONFIG["wake_words"]]
-LANGUAGE = CONFIG.get("language", "hi-IN")
 CONTACTS = CONFIG["contacts"]
 AI_MODEL = CONFIG["ai_model"]
 AI_FALLBACK = CONFIG["ai_fallback"]
 
 AI_SYSTEM_PROMPT = (
-    "You are a personal voice assistant. Your reply will be read aloud by a text-to-speech engine. "
-    "Answer in at most three short sentences, in plain text only: no markdown, no bullet points, "
-    "no asterisks, no emojis. If the user writes in Hinglish, reply in Hinglish using Roman script."
+    "You are a personal voice assistant. Answer in at most three short sentences, "
+    "plain text only, no markdown, no emojis."
 )
 
 
@@ -169,49 +142,65 @@ NOTES_FILE = os.path.join(os.path.expanduser("~"), "Documents", "assistant_notes
 
 
 # ==================================================
-# APPS DATA
+# APPS DATABASE
 # ==================================================
 
 APPS = {
     "notepad": "notepad",
+    "note pad": "notepad",
     "calculator": "calc",
+    "calc": "calc",
     "paint": "mspaint",
+    "ms paint": "mspaint",
     "word": "winword",
+    "ms word": "winword",
     "excel": "excel",
+    "ms excel": "excel",
     "powerpoint": "powerpnt",
     "power point": "powerpnt",
+    "ppt": "powerpnt",
     "chrome": "chrome",
     "google chrome": "chrome",
+    "browser": "chrome",
     "edge": "msedge",
+    "microsoft edge": "msedge",
     "vs code": "code",
+    "vscode": "code",
     "visual studio code": "code",
+    "code": "code",
     "task manager": "taskmgr",
+    "taskmgr": "taskmgr",
     "control panel": "control",
     "terminal": "wt",
+    "windows terminal": "wt",
     "snipping tool": "snippingtool",
     "spotify": "spotify",
+    "camera": "microsoft.windows.camera:",
+    "settings": "ms-settings:",
+    "file explorer": "explorer",
+    "explorer": "explorer",
+    "files": "explorer",
+    "cmd": "cmd",
+    "command prompt": "cmd",
 }
 
 PROCESSES = {
     "chrome": "chrome.exe",
-    "google chrome": "chrome.exe",
+    "browser": "chrome.exe",
     "vs code": "Code.exe",
-    "visual studio code": "Code.exe",
+    "vscode": "Code.exe",
+    "code": "Code.exe",
     "edge": "msedge.exe",
     "word": "WINWORD.EXE",
     "excel": "EXCEL.EXE",
     "powerpoint": "POWERPNT.EXE",
-    "power point": "POWERPNT.EXE",
+    "ppt": "POWERPNT.EXE",
     "notepad": "notepad.exe",
     "calculator": "CalculatorApp.exe",
-    "settings": "SystemSettings.exe",
-    "camera": "WindowsCamera.exe",
     "paint": "mspaint.exe",
     "task manager": "Taskmgr.exe",
-    "github desktop": "GitHubDesktop.exe",
-    "git bash": "mintty.exe",
-    "whatsapp": "WhatsApp.exe",
     "spotify": "Spotify.exe",
+    "camera": "WindowsCamera.exe",
 }
 
 CLOSE_ALL_LIST = [
@@ -234,53 +223,24 @@ JOKES = [
 gui_window = None
 gui_log_box = None
 gui_status_label = None
-assistant_running = True       # Thread alive?
-assistant_active = True        # Exit/Hello toggle
+assistant_running = True
+assistant_active = True
 gui_queue = queue.Queue()
 
 
 # ==================================================
-# TEXT TO SPEECH (with Hindi voice support)
+# TTS
 # ==================================================
 
 engine = pyttsx3.init()
 engine.setProperty("rate", 170)
-
 _tts_lock = threading.Lock()
-_hindi_voice_set = False
-
-
-def set_hindi_voice():
-    """Try to set a Hindi voice for TTS if available."""
-    global _hindi_voice_set
-
-    if _hindi_voice_set:
-        return True
-
-    try:
-        voices = engine.getProperty("voices")
-        for voice in voices:
-            name = voice.name.lower()
-            vid = voice.id.lower()
-            if "hindi" in name or "hi-in" in vid or "kalpana" in name or "hemant" in name:
-                engine.setProperty("voice", voice.id)
-                log.info(f"Hindi voice set: {voice.name}")
-                _hindi_voice_set = True
-                return True
-        log.warning("No Hindi voice found. Using default voice.")
-    except Exception as e:
-        log.error(f"Voice set error: {e}")
-
-    return False
 
 
 def speak(text):
-    """Speak text and log it. Thread-safe via lock."""
     print("Assistant:", text)
     log.info(f"ASSISTANT: {text}")
-
     gui_queue.put(("assistant", text))
-
     with _tts_lock:
         try:
             engine.say(text)
@@ -290,7 +250,7 @@ def speak(text):
 
 
 # ==================================================
-# LISTEN (Hindi + English)
+# LISTEN
 # ==================================================
 
 recognizer = sr.Recognizer()
@@ -298,7 +258,6 @@ _calibrated = False
 
 
 def listen(timeout=LISTEN_TIMEOUT, phrase_limit=PHRASE_LIMIT):
-    """Returns recognized text in ORIGINAL case, or '' if nothing understood."""
     global _calibrated
 
     try:
@@ -308,9 +267,7 @@ def listen(timeout=LISTEN_TIMEOUT, phrase_limit=PHRASE_LIMIT):
                 _calibrated = True
 
             print("\nListening...")
-            audio = recognizer.listen(
-                source, timeout=timeout, phrase_time_limit=phrase_limit
-            )
+            audio = recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_limit)
 
     except sr.WaitTimeoutError:
         return ""
@@ -319,50 +276,37 @@ def listen(timeout=LISTEN_TIMEOUT, phrase_limit=PHRASE_LIMIT):
         time.sleep(3)
         return ""
 
-    # Try Hindi first, fallback to English
-    for lang in (LANGUAGE, "en-IN"):
-        try:
-            text = recognizer.recognize_google(audio, language=lang).strip()
-            print(f"You ({lang}):", text)
-            log.info(f"USER ({lang}): {text}")
-            gui_queue.put(("user", text))
-            return text
-        except sr.UnknownValueError:
-            continue
-        except sr.RequestError:
-            speak("Speech recognition service is not available. Check your internet.")
-            time.sleep(2)
-            return ""
-
-    print("Could not understand.")
-    return ""
+    try:
+        text = recognizer.recognize_google(audio, language="en-IN").strip()
+        print("You:", text)
+        log.info(f"USER: {text}")
+        gui_queue.put(("user", text))
+        return text
+    except sr.UnknownValueError:
+        print("Could not understand.")
+        return ""
+    except sr.RequestError:
+        speak("Speech recognition not available. Check internet.")
+        time.sleep(2)
+        return ""
 
 
 def words_in(text):
     return set(re.findall(r"[a-z0-9']+", text.lower()))
 
 
-def has_word(text, *words):
-    tokens = words_in(text)
-    return any(w in tokens for w in words)
-
-
 def confirm(question):
     if not CONFIRM_DANGEROUS:
         return True
-
     speak(question + " Say yes or no.")
-
     for _ in range(2):
         answer = listen(timeout=5, phrase_limit=4)
         tokens = words_in(answer)
-
-        if tokens & {"yes", "yeah", "yep", "confirm", "sure", "haan", "ha", "haan ji"}:
+        if tokens & {"yes", "yeah", "yep", "confirm", "sure", "ok", "okay"}:
             return True
-        if tokens & {"no", "nope", "cancel", "stop", "nahi", "nahin", "mat karo"}:
+        if tokens & {"no", "nope", "cancel", "stop"}:
             return False
-
-    speak("I did not get a clear answer, so I cancelled it.")
+    speak("Cancelled.")
     return False
 
 
@@ -374,193 +318,147 @@ def write_text(text, interval=0.04):
         pyautogui.write(text, interval=interval)
 
 
-# ==================================================
-# HINDI KEYWORD TRANSLATION
-# ==================================================
-
-HINDI_MAP = {
-    "kholo": "open",
-    "khol": "open",
-    "kholiye": "open",
-    "band karo": "close",
-    "band kar": "close",
-    "band": "close",
-    "bajao": "play",
-    "baja": "play",
-    "dikhao": "show",
-    "batao": "tell",
-    "bata": "tell",
-    "samay": "time",
-    "taareekh": "date",
-    "tarikh": "date",
-    "mausam": "weather",
-    "gaana": "song",
-    "photo": "picture",
-    "tasveer": "picture",
-    "screenshot": "screenshot",
-    "yaad dila": "remind",
-    "yaad": "remind",
-    "alarm": "alarm",
-    "note": "note",
-    "likho": "note",
-    "chutkula": "joke",
-    "joke": "joke",
-    "madad": "help",
-    "sahayata": "help",
-    "alvida": "exit",
-    "band ho jao": "exit",
-    "namaste": "hello",
-    "namaskar": "hello",
-}
-
-
-def translate_hindi(text):
-    """Convert common Hindi keywords to English for matching."""
-    result = text.lower().strip()
-    for hindi, english in HINDI_MAP.items():
-        if hindi in result:
-            result = result.replace(hindi, english)
-    return result
+def check_reminders():
+    while not reminder_queue.empty():
+        speak(reminder_queue.get())
 
 
 # ==================================================
-# WAKE WORD DETECTION
+# WAKE WORD
 # ==================================================
 
 def wait_for_wake_word():
-    """Blocks until a wake word is detected. Returns True."""
     log.info("Waiting for wake word...")
-
     while assistant_running:
         try:
             check_reminders()
-
             with sr.Microphone() as source:
                 try:
-                    audio = recognizer.listen(
-                        source, timeout=3, phrase_time_limit=4
-                    )
+                    audio = recognizer.listen(source, timeout=3, phrase_time_limit=4)
                 except sr.WaitTimeoutError:
                     continue
-
-            for lang in (LANGUAGE, "en-IN"):
-                try:
-                    text = recognizer.recognize_google(audio, language=lang).lower().strip()
-                    break
-                except sr.UnknownValueError:
-                    text = ""
-                except sr.RequestError:
-                    text = ""
-                    break
-
-            if not text:
-                continue
-
-            log.debug(f"Heard (wake check): {text}")
-
+            text = recognizer.recognize_google(audio, language="en-IN").lower().strip()
             for wake in WAKE_WORDS:
                 if wake in text:
-                    log.info(f"Wake word detected: {wake}")
                     return True
-
-            if "hello" in text or "namaste" in text:
+            if "hello" in text or "hey assistant" in text:
                 return True
-
+        except (sr.UnknownValueError, sr.RequestError):
+            continue
         except Exception as e:
             log.error(f"Wake word error: {e}")
             time.sleep(1)
-
     return False
 
 
 # ==================================================
-# STANDBY MODE
+# STANDBY
 # ==================================================
 
 def standby_mode():
-    speak(f"Okay {USER_NAME}, I am going on standby. Say Hello when you need me.")
-
+    speak(f"Okay {USER_NAME}, standby mode. Say Hello when you need me.")
     while assistant_running:
         check_reminders()
         wake = listen().lower().strip()
-
-        if wake in ("hello", "hi", "wake up") or "hello assistant" in wake or "namaste" in wake:
-            speak(f"Hello {USER_NAME}, I am back. How can I help you?")
+        if wake in ("hello", "hi", "wake up") or "hello assistant" in wake:
+            speak(f"Hello {USER_NAME}, I am back.")
             return
 
 
 # ==================================================
-# APPS
+# APPS - FLEXIBLE OPEN / CLOSE
 # ==================================================
 
-def open_app(app_name):
-    app_name = app_name.strip().lower()
-    target = APPS.get(app_name, app_name)
+def find_app(query):
+    """Find best matching app from query."""
+    query = query.lower().strip()
 
+    for w in ["open", "launch", "start", "run", "the", "app", "application", "please"]:
+        query = re.sub(rf"\b{w}\b", "", query, flags=re.IGNORECASE)
+    query = query.strip()
+
+    if not query:
+        return None
+
+    if query in APPS:
+        return query, APPS[query]
+
+    for key, value in APPS.items():
+        if key in query or query in key:
+            return key, value
+
+    query_words = set(query.split())
+    for key, value in APPS.items():
+        key_words = set(key.split())
+        if key_words & query_words:
+            return key, value
+
+    return None
+
+
+def open_app(app_query):
+    result = find_app(app_query)
+
+    if not result:
+        speak("I don't know how to open " + app_query)
+        return
+
+    app_name, target = result
     speak("Opening " + app_name)
 
     try:
-        result = subprocess.run(
-            ["cmd", "/c", "start", "", target],
-            capture_output=True,
-            text=True,
-        )
-
-        if result.returncode != 0:
-            speak("Sorry, I could not find " + app_name)
+        if target.startswith("http"):
+            webbrowser.open(target)
+        elif target.endswith(":"):
+            os.system(f"start {target}")
         else:
-            time.sleep(1.5)
-
+            subprocess.run(["cmd", "/c", "start", "", target], capture_output=True)
+        time.sleep(1)
     except Exception as e:
         log.error(f"Open error: {e}")
-        speak("Sorry, I could not open " + app_name)
+        speak("Could not open " + app_name)
 
 
-def close_explorer_windows():
-    subprocess.run(
-        [
-            "powershell",
-            "-NoProfile",
-            "-Command",
-            "(New-Object -ComObject Shell.Application).Windows() "
-            "| ForEach-Object { $_.Quit() }",
-        ],
-        capture_output=True,
-    )
+def close_app(app_query):
+    query = app_query.lower().strip()
+    for w in ["close", "the", "app", "application", "please"]:
+        query = re.sub(rf"\b{w}\b", "", query, flags=re.IGNORECASE)
+    query = query.strip()
 
-
-def close_app(app_name):
-    name = app_name.lower().strip()
-
-    if name in ("file explorer", "explorer", "files"):
-        speak("Closing File Explorer windows.")
-        close_explorer_windows()
+    if query in ("file explorer", "explorer", "files"):
+        speak("Closing File Explorer.")
+        subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "(New-Object -ComObject Shell.Application).Windows() | ForEach-Object { $_.Quit() }"],
+            capture_output=True,
+        )
         return
 
-    process = PROCESSES.get(name)
+    process = PROCESSES.get(query)
+    if not process:
+        for key, value in PROCESSES.items():
+            if key in query or query in key:
+                process = value
+                break
 
     if process:
-        speak("Closing " + name)
+        speak("Closing " + query)
         subprocess.run(["taskkill", "/F", "/IM", process], capture_output=True)
-        return
-
-    if name in ("python", "cmd", "command prompt", "terminal"):
-        speak("I will not close that, because I might be running inside it.")
-        return
-
-    speak("I do not know how to close " + name)
+    else:
+        speak("I don't know how to close " + query)
 
 
 def close_all_apps():
-    if not confirm("This will close browsers and common apps. Unsaved work may be lost. Continue?"):
+    if not confirm("Close all common apps? Unsaved work may be lost."):
         return
-
-    speak("Closing common applications.")
-
+    speak("Closing all apps.")
     for process in CLOSE_ALL_LIST:
         subprocess.run(["taskkill", "/F", "/IM", process], capture_output=True)
-
-    close_explorer_windows()
+    subprocess.run(
+        ["powershell", "-NoProfile", "-Command",
+         "(New-Object -ComObject Shell.Application).Windows() | ForEach-Object { $_.Quit() }"],
+        capture_output=True,
+    )
     speak("Done.")
 
 
@@ -574,32 +472,26 @@ def open_camera():
 
 
 def take_picture():
-    speak("Taking the picture. Make sure the Camera app is closed.")
-
+    speak("Taking a picture.")
     camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-
     if not camera.isOpened():
-        speak("I could not access the camera.")
+        speak("Camera not accessible. Close Camera app first.")
         return
-
     try:
         frame = None
         ok = False
         for _ in range(20):
             ok, frame = camera.read()
             time.sleep(0.05)
-
         if ok and frame is not None:
             os.makedirs(DATA_FOLDER, exist_ok=True)
             filename = datetime.datetime.now().strftime("photo_%Y%m%d_%H%M%S.jpg")
             path = os.path.join(DATA_FOLDER, filename)
             cv2.imwrite(path, frame)
-
-            speak("Picture taken successfully.")
-            log.info(f"Photo saved: {path}")
+            speak("Picture taken.")
+            log.info(f"Photo: {path}")
         else:
-            speak("I could not take the picture.")
-
+            speak("Could not take picture.")
     finally:
         camera.release()
 
@@ -608,73 +500,119 @@ def take_screenshot():
     os.makedirs(DATA_FOLDER, exist_ok=True)
     filename = datetime.datetime.now().strftime("screenshot_%Y%m%d_%H%M%S.png")
     path = os.path.join(DATA_FOLDER, filename)
-
     pyautogui.screenshot(path)
-
     speak("Screenshot saved.")
-    log.info(f"Screenshot saved: {path}")
+    log.info(f"Screenshot: {path}")
+
+
+# ==================================================
+# YOUTUBE / GOOGLE
+# ==================================================
+
+def youtube_open():
+    speak("Opening YouTube.")
+    webbrowser.open("https://www.youtube.com")
+
+
+def youtube_play(query=""):
+    """Open YouTube and search. If empty query, play random popular songs."""
+    query = query.strip().lower() if query else ""
+
+    # If user just said "play a song" or similar, play random popular songs
+    empty_queries = (
+        "", "a song", "song", "songs", "any song", "random song",
+        "music", "some song", "a random song", "the song", "the",
+        "a", "an", "some", "any", "random", "something", "anything",
+    )
+
+    if query in empty_queries:
+        speak("Playing random songs on YouTube.")
+        webbrowser.open("https://www.youtube.com/results?search_query=popular+songs+2024")
+        return
+
+    speak("Playing " + query + " on YouTube.")
+    webbrowser.open("https://www.youtube.com/results?search_query=" + urllib.parse.quote(query))
+
+
+def google_open():
+    speak("Opening Google.")
+    webbrowser.open("https://www.google.com")
+
+
+def google_search(query):
+    if not query:
+        google_open()
+        return
+    speak("Searching Google for " + query)
+    webbrowser.open("https://www.google.com/search?q=" + urllib.parse.quote(query))
 
 
 # ==================================================
 # WHATSAPP
 # ==================================================
 
-def whatsapp_voice_message(raw_command):
-    match = re.search(
-        r"search\s+(.+?)\s+and\s+send\s+(?:the\s+)?message\s+(.+)",
-        raw_command,
-        re.IGNORECASE,
-    )
-
+def whatsapp_message(raw):
+    match = re.search(r"search\s+(.+?)\s+and\s+send\s+(?:the\s+)?message\s+(.+)", raw, re.IGNORECASE)
     if not match:
-        speak("Please say: search, the contact name, and send the message, then your message.")
+        speak("Say: open WhatsApp and search, contact name, and send message, then your message.")
         return
-
-    contact_name = match.group(1).strip()
+    contact = match.group(1).strip()
     message = match.group(2).strip()
-
-    if not contact_name or not message:
-        speak("I need both a contact name and a message.")
+    if not confirm(f"Send message to {contact}?"):
         return
-
-    if not confirm(f"Send the message {message} to {contact_name}?"):
-        speak("Okay, message cancelled.")
-        return
-
     try:
         speak("Opening WhatsApp.")
         webbrowser.open("https://web.whatsapp.com")
         time.sleep(WHATSAPP_LOAD_SECONDS)
-
-        speak("Searching for " + contact_name)
         pyautogui.hotkey("ctrl", "alt", "/")
         time.sleep(1)
-
-        write_text(contact_name)
+        write_text(contact)
         time.sleep(2)
         pyautogui.press("enter")
         time.sleep(2)
-
-        speak("Typing your message.")
         write_text(message)
         time.sleep(1)
         pyautogui.press("enter")
-
-        speak("Message sent to " + contact_name)
-
+        speak("Message sent to " + contact)
     except Exception as e:
         log.error(f"WhatsApp error: {e}")
-        speak("Sorry, I could not complete the WhatsApp command.")
-
-
-def open_whatsapp():
-    speak("Opening WhatsApp.")
-    webbrowser.open("https://web.whatsapp.com")
+        speak("Could not send WhatsApp message.")
 
 
 # ==================================================
-# JAVA
+# JAVA / TYPE
 # ==================================================
+
+def to_class_name(spoken):
+    spoken = re.sub(r"^(?:called|named|name)\s+", "", spoken.strip(), flags=re.IGNORECASE)
+    words = re.findall(r"[A-Za-z0-9]+", spoken)
+    if len(words) > 1 and words[-1].lower() == "java":
+        words = words[:-1]
+    if not words:
+        return ""
+    name = "".join(w.capitalize() for w in words)
+    if name[0].isdigit():
+        name = "Program" + name
+    return name
+
+
+def create_java_file(spoken_name):
+    class_name = to_class_name(spoken_name)
+    if not class_name:
+        speak("Tell me the file name.")
+        return
+    os.makedirs(JAVA_FOLDER, exist_ok=True)
+    path = os.path.join(JAVA_FOLDER, class_name + ".java")
+    if os.path.exists(path):
+        speak("File already exists.")
+        os.startfile(path)
+        return
+    code = f'public class {class_name} {{\n    public static void main(String[] args) {{\n        System.out.println("Hello {USER_NAME}");\n    }}\n}}\n'
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(code)
+    speak(class_name + ".java created.")
+    os.startfile(path)
+
 
 def open_java_folder():
     os.makedirs(JAVA_FOLDER, exist_ok=True)
@@ -682,83 +620,10 @@ def open_java_folder():
     os.startfile(JAVA_FOLDER)
 
 
-def to_class_name(spoken):
-    spoken = re.sub(r"^(?:called|named|name)\s+", "", spoken.strip(), flags=re.IGNORECASE)
-    words = re.findall(r"[A-Za-z0-9]+", spoken)
-
-    if len(words) > 1 and words[-1].lower() == "java":
-        words = words[:-1]
-
-    if not words:
-        return ""
-
-    name = "".join(w.capitalize() for w in words)
-
-    if name[0].isdigit():
-        name = "Program" + name
-
-    return name
-
-
-def create_java_file(spoken_name):
-    class_name = to_class_name(spoken_name)
-
-    if not class_name:
-        speak("Please tell me the file name.")
-        return
-
-    os.makedirs(JAVA_FOLDER, exist_ok=True)
-    path = os.path.join(JAVA_FOLDER, class_name + ".java")
-
-    if os.path.exists(path):
-        speak("That Java file already exists.")
-        os.startfile(path)
-        return
-
-    code = f"""public class {class_name} {{
-
-    public static void main(String[] args) {{
-
-        System.out.println("Hello {USER_NAME}");
-
-    }}
-
-}}
-"""
-
-    with open(path, "w", encoding="utf-8") as file:
-        file.write(code)
-
-    speak(class_name + ".java has been created.")
-    os.startfile(path)
-
-
-# ==================================================
-# TYPE / SEARCH
-# ==================================================
-
 def type_text(text):
-    speak("Click where you want to type. I will start in three seconds.")
+    speak("Click where to type. Starting in 3 seconds.")
     time.sleep(3)
     write_text(text)
-
-
-def google_search(query):
-    if not query:
-        return
-
-    speak("Searching Google.")
-    webbrowser.open("https://www.google.com/search?q=" + urllib.parse.quote(query))
-
-
-def youtube_search(query):
-    if not query:
-        return
-
-    speak("Searching YouTube for " + query)
-    webbrowser.open(
-        "https://www.youtube.com/results?search_query=" + urllib.parse.quote(query)
-    )
 
 
 # ==================================================
@@ -766,20 +631,18 @@ def youtube_search(query):
 # ==================================================
 
 def shutdown_laptop():
-    if not confirm("Do you really want to shut down the laptop?"):
-        speak("Okay, shutdown cancelled.")
+    if not confirm("Shut down the laptop?"):
+        speak("Cancelled.")
         return
-
-    speak(f"Shutting down in {SHUTDOWN_DELAY_SECONDS} seconds. Say cancel shutdown to stop.")
+    speak(f"Shutting down in {SHUTDOWN_DELAY_SECONDS} seconds. Say cancel shutdown.")
     os.system(f"shutdown /s /t {SHUTDOWN_DELAY_SECONDS}")
 
 
 def restart_laptop():
-    if not confirm("Do you really want to restart the laptop?"):
-        speak("Okay, restart cancelled.")
+    if not confirm("Restart the laptop?"):
+        speak("Cancelled.")
         return
-
-    speak(f"Restarting in {SHUTDOWN_DELAY_SECONDS} seconds. Say cancel shutdown to stop.")
+    speak(f"Restarting in {SHUTDOWN_DELAY_SECONDS} seconds.")
     os.system(f"shutdown /r /t {SHUTDOWN_DELAY_SECONDS}")
 
 
@@ -789,7 +652,7 @@ def cancel_shutdown():
 
 
 def sleep_laptop():
-    speak("Putting the laptop to sleep.")
+    speak("Sleeping.")
     time.sleep(2)
     subprocess.run(["rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0"])
 
@@ -797,10 +660,8 @@ def sleep_laptop():
 def change_volume(direction):
     key = {"up": "volumeup", "down": "volumedown", "mute": "volumemute"}[direction]
     presses = 1 if direction == "mute" else 5
-
     for _ in range(presses):
         pyautogui.press(key)
-
     speak("Volume " + direction)
 
 
@@ -812,152 +673,108 @@ def save_note(text):
     if not text:
         speak("What should I note?")
         return
-
     os.makedirs(os.path.dirname(NOTES_FILE), exist_ok=True)
     stamp = datetime.datetime.now().strftime("%d-%m-%Y %I:%M %p")
-
-    with open(NOTES_FILE, "a", encoding="utf-8") as file:
-        file.write(f"[{stamp}] {text}\n")
-
+    with open(NOTES_FILE, "a", encoding="utf-8") as f:
+        f.write(f"[{stamp}] {text}\n")
     speak("Note saved.")
 
 
 def read_notes():
     if not os.path.exists(NOTES_FILE):
-        speak("You have no notes yet.")
+        speak("No notes yet.")
         return
-
-    with open(NOTES_FILE, "r", encoding="utf-8") as file:
-        lines = [line.strip() for line in file if line.strip()]
-
+    with open(NOTES_FILE, "r", encoding="utf-8") as f:
+        lines = [l.strip() for l in f if l.strip()]
     if not lines:
-        speak("You have no notes yet.")
+        speak("No notes yet.")
         return
-
-    speak("Your last notes are:")
+    speak("Last notes:")
     for line in lines[-3:]:
         speak(line)
 
 
 def tell_help():
-    speak(
-        "I can open and close apps, search Google and YouTube, "
-        "send WhatsApp messages, take pictures and screenshots, "
-        "create Java files, type for you, control volume, save notes, "
-        "tell time, date and weather, look things up on Wikipedia, "
-        "set reminders and alarms, send emails, answer questions with AI, "
-        "and shut down, restart or sleep the laptop."
-    )
+    speak("I can open and close apps, play YouTube, search Google, take pictures and screenshots, "
+          "set reminders and alarms, tell time, date and weather, look up Wikipedia, save notes, "
+          "control volume, send WhatsApp messages, and shut down or restart the laptop.")
 
 
 # ==================================================
-# INTERNET HELPERS
+# WEATHER / WIKIPEDIA
 # ==================================================
 
 WEATHER_CODES = {
     0: "clear sky", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",
-    45: "foggy", 48: "foggy",
-    51: "light drizzle", 53: "drizzle", 55: "heavy drizzle",
-    56: "freezing drizzle", 57: "freezing drizzle",
-    61: "light rain", 63: "rain", 65: "heavy rain",
-    66: "freezing rain", 67: "freezing rain",
-    71: "light snow", 73: "snow", 75: "heavy snow", 77: "snow grains",
-    80: "light rain showers", 81: "rain showers", 82: "heavy rain showers",
-    85: "snow showers", 86: "heavy snow showers",
-    95: "a thunderstorm", 96: "a thunderstorm with hail", 99: "a thunderstorm with hail",
+    45: "foggy", 48: "foggy", 51: "light drizzle", 53: "drizzle", 55: "heavy drizzle",
+    61: "light rain", 63: "rain", 65: "heavy rain", 71: "light snow", 73: "snow",
+    75: "heavy snow", 80: "light rain showers", 81: "rain showers", 82: "heavy rain showers",
+    95: "a thunderstorm", 96: "a thunderstorm with hail",
 }
 
 
 def http_json(url, timeout=8):
-    request = urllib.request.Request(
-        url, headers={"User-Agent": "PersonalVoiceAssistant/1.0"}
-    )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return json.loads(response.read().decode("utf-8"))
+    req = urllib.request.Request(url, headers={"User-Agent": "VoiceAssistant/1.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
 
 def get_weather(city=""):
     city = city.strip() or DEFAULT_CITY
-
     try:
-        geo = http_json(
-            "https://geocoding-api.open-meteo.com/v1/search?count=1&name="
-            + urllib.parse.quote(city)
-        )
-
+        geo = http_json("https://geocoding-api.open-meteo.com/v1/search?count=1&name=" + urllib.parse.quote(city))
         results = geo.get("results")
-
         if not results:
-            speak("I could not find a city called " + city)
+            speak("Could not find " + city)
             return
-
         place = results[0]
-
         weather = http_json(
             "https://api.open-meteo.com/v1/forecast"
             f"?latitude={place['latitude']}&longitude={place['longitude']}"
             "&current=temperature_2m,apparent_temperature,relative_humidity_2m,"
             "weather_code,wind_speed_10m&timezone=auto"
         )["current"]
-
-        description = WEATHER_CODES.get(weather["weather_code"], "unknown conditions")
-
+        desc = WEATHER_CODES.get(weather["weather_code"], "unknown")
         speak(
-            f"In {place['name']} it is {round(weather['temperature_2m'])} degrees Celsius, "
-            f"feels like {round(weather['apparent_temperature'])}, with {description}. "
-            f"Humidity is {round(weather['relative_humidity_2m'])} percent and wind is "
-            f"{round(weather['wind_speed_10m'])} kilometres per hour."
+            f"In {place['name']} it is {round(weather['temperature_2m'])} degrees, "
+            f"feels like {round(weather['apparent_temperature'])}, {desc}. "
+            f"Humidity {round(weather['relative_humidity_2m'])} percent."
         )
-
     except Exception as e:
         log.error(f"Weather error: {e}")
-        speak("I could not get the weather right now. Please check your internet.")
+        speak("Could not get weather. Check internet.")
 
 
 def wikipedia_answer(topic):
     topic = topic.strip()
-
     if not topic:
-        speak("What should I look up?")
+        speak("What to look up?")
         return
-
     speak("Looking up " + topic)
-
     try:
         search = http_json(
             "https://en.wikipedia.org/w/api.php?action=query&list=search"
             "&format=json&srlimit=1&srsearch=" + urllib.parse.quote(topic)
         )
-
         hits = search.get("query", {}).get("search", [])
-
         if not hits:
-            speak("I could not find anything about " + topic)
+            speak("Nothing found.")
             return
-
         title = hits[0]["title"]
-
-        page = http_json(
-            "https://en.wikipedia.org/api/rest_v1/page/summary/"
-            + urllib.parse.quote(title.replace(" ", "_"))
-        )
-
+        page = http_json("https://en.wikipedia.org/api/rest_v1/page/summary/" + urllib.parse.quote(title.replace(" ", "_")))
         extract = page.get("extract", "").strip()
-
         if not extract:
-            speak("I could not find a summary for " + title)
+            speak("No summary.")
             return
-
         sentences = re.split(r"(?<=[.!?])\s+", extract)
         speak(" ".join(sentences[:2]))
-
     except Exception as e:
-        log.error(f"Wikipedia error: {e}")
-        speak("I could not reach Wikipedia right now.")
+        log.error(f"Wikipedia: {e}")
+        speak("Could not reach Wikipedia.")
 
 
 # ==================================================
-# REMINDERS AND ALARMS
+# REMINDERS / ALARMS
 # ==================================================
 
 reminder_queue = queue.Queue()
@@ -967,23 +784,13 @@ _reminder_counter = 0
 NUMBER_WORDS = {
     "a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
     "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "fifteen": 15,
-    "twenty": 20, "thirty": 30, "forty": 40, "sixty": 60,
-    "ek": 1, "do": 2, "teen": 3, "char": 4, "paanch": 5, "chhe": 6,
-    "saat": 7, "aath": 8, "nau": 9, "das": 10, "pandrah": 15,
+    "twenty": 20, "thirty": 30,
 }
-
-UNIT_SECONDS = {
-    "second": 1, "seconds": 1, "sec": 1,
-    "minute": 60, "minutes": 60, "min": 60,
-    "hour": 3600, "hours": 3600,
-    "सेकंड": 1, "मिनट": 60, "घंटा": 3600,
-    "second": 1, "minute": 60, "hour": 3600,
-}
+UNIT_SECONDS = {"second": 1, "seconds": 1, "sec": 1, "minute": 60, "minutes": 60, "min": 60, "hour": 3600, "hours": 3600}
 
 
 def _fire_reminder(reminder_id, message):
     pending_reminders.pop(reminder_id, None)
-
     try:
         import winsound
         for _ in range(3):
@@ -991,115 +798,82 @@ def _fire_reminder(reminder_id, message):
             time.sleep(0.2)
     except Exception:
         pass
-
     reminder_queue.put(message)
 
 
 def schedule_reminder(seconds, message):
     global _reminder_counter
-
     _reminder_counter += 1
-    reminder_id = _reminder_counter
-
-    timer = threading.Timer(seconds, _fire_reminder, args=(reminder_id, message))
-    timer.daemon = True
-    timer.start()
-
+    rid = _reminder_counter
+    t = threading.Timer(seconds, _fire_reminder, args=(rid, message))
+    t.daemon = True
+    t.start()
     due = datetime.datetime.now() + datetime.timedelta(seconds=seconds)
-    pending_reminders[reminder_id] = (due, message, timer)
+    pending_reminders[rid] = (due, message, t)
 
 
-def check_reminders():
-    while not reminder_queue.empty():
-        speak(reminder_queue.get())
-
-
-def set_reminder(raw_command):
+def set_reminder(raw):
     match = re.search(
         r"remind me in (\w+)\s+(second|minute|hour|sec|min)s?\s*(?:to|about|that)?\s*(.*)",
-        raw_command,
-        re.IGNORECASE,
+        raw, re.IGNORECASE,
     )
-
     if not match:
-        speak("Please say for example: remind me in 10 minutes to drink water.")
+        speak("Say: remind me in 10 minutes to drink water.")
         return
-
-    amount_text = match.group(1).lower()
+    amt_text = match.group(1).lower()
     unit = match.group(2).lower()
     what = match.group(3).strip() or "your reminder"
-
-    amount = int(amount_text) if amount_text.isdigit() else NUMBER_WORDS.get(amount_text)
-
-    if not amount:
-        speak("I could not understand the time. Please say the number in digits.")
+    amt = int(amt_text) if amt_text.isdigit() else NUMBER_WORDS.get(amt_text)
+    if not amt:
+        speak("Say number in digits.")
         return
-
-    schedule_reminder(amount * UNIT_SECONDS[unit], "Reminder: " + what)
-
-    plural = "" if amount == 1 else "s"
-    speak(f"Okay, I will remind you in {amount} {unit}{plural} to {what}.")
+    schedule_reminder(amt * UNIT_SECONDS.get(unit, 60), "Reminder: " + what)
+    plural = "" if amt == 1 else "s"
+    speak(f"Okay, reminder in {amt} {unit}{plural}.")
 
 
-def set_alarm(command):
-    text = command.replace(".", "")
-
-    match = re.search(
-        r"alarm\s+(?:for|at)\s+(\d{1,2})(?:[:\s](\d{2}))?\s*(am|pm)?",
-        text,
-    )
-
+def set_alarm(cmd):
+    text = cmd.replace(".", "")
+    match = re.search(r"alarm\s+(?:for|at)\s+(\d{1,2})(?:[:\s](\d{2}))?\s*(am|pm)?", text)
     if not match:
-        speak("Please say for example: set alarm for 7:30 am.")
+        speak("Say: set alarm for 7:30 am.")
         return
-
     hour = int(match.group(1))
     minute = int(match.group(2) or 0)
     suffix = match.group(3)
-
     if suffix == "pm" and hour < 12:
         hour += 12
     elif suffix == "am" and hour == 12:
         hour = 0
-    elif not suffix:
-        if hour <= 7:
-            hour += 12
-
+    elif not suffix and hour <= 7:
+        hour += 12
     if hour > 23 or minute > 59:
-        speak("That is not a valid time.")
+        speak("Invalid time.")
         return
-
     now = datetime.datetime.now()
     due = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-
     if due <= now:
         due += datetime.timedelta(days=1)
-
     label = due.strftime("%I:%M %p")
-
     schedule_reminder((due - now).total_seconds(), f"Alarm! It is {label}.")
     speak("Alarm set for " + label)
 
 
 def list_reminders():
-    items = sorted(pending_reminders.values(), key=lambda item: item[0])
-
+    items = sorted(pending_reminders.values(), key=lambda x: x[0])
     if not items:
-        speak("You have no reminders or alarms.")
+        speak("No reminders.")
         return
-
-    speak(f"You have {len(items)} pending.")
-
-    for due, message, _ in items:
-        speak(f"{due.strftime('%I:%M %p')}: {message}")
+    speak(f"{len(items)} pending.")
+    for due, msg, _ in items:
+        speak(f"{due.strftime('%I:%M %p')}: {msg}")
 
 
 def cancel_reminders():
-    for _, _, timer in list(pending_reminders.values()):
-        timer.cancel()
-
+    for _, _, t in list(pending_reminders.values()):
+        t.cancel()
     pending_reminders.clear()
-    speak("All reminders and alarms cancelled.")
+    speak("All reminders cancelled.")
 
 
 # ==================================================
@@ -1109,65 +883,50 @@ def cancel_reminders():
 def send_email():
     address = os.environ.get("ASSISTANT_EMAIL")
     password = os.environ.get("ASSISTANT_EMAIL_PASSWORD")
-
     if not address or not password:
-        speak("Email is not set up. Please set the email environment variables first.")
+        speak("Email not set up.")
         return
-
-    speak("Who should I send it to?")
-    spoken_name = listen(timeout=6, phrase_limit=5).lower().strip()
-
+    speak("Who to send?")
+    spoken = listen(timeout=6, phrase_limit=5).lower().strip()
     recipient = None
     recipient_name = None
-
-    for name, email_address in CONTACTS.items():
-        if name in spoken_name:
-            recipient = email_address
+    for name, email_addr in CONTACTS.items():
+        if name in spoken:
+            recipient = email_addr
             recipient_name = name
             break
-
     if not recipient:
-        speak("I do not have that contact.")
+        speak("Contact not found.")
         return
-
-    speak("What is the subject?")
+    speak("Subject?")
     subject = listen(timeout=6, phrase_limit=10)
-
     if not subject:
-        speak("I did not hear a subject. Email cancelled.")
+        speak("Email cancelled.")
         return
-
-    speak("What should I write?")
+    speak("Message?")
     body = listen(timeout=8, phrase_limit=30)
-
     if not body:
-        speak("I did not hear the message. Email cancelled.")
+        speak("Email cancelled.")
         return
-
-    if not confirm(f"Send an email to {recipient_name} with subject {subject}?"):
-        speak("Okay, email cancelled.")
+    if not confirm(f"Send to {recipient_name}?"):
         return
-
     try:
-        message = EmailMessage()
-        message["From"] = address
-        message["To"] = recipient
-        message["Subject"] = subject
-        message.set_content(body)
-
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as server:
-            server.login(address, password)
-            server.send_message(message)
-
-        speak("Email sent to " + recipient_name)
-
+        msg = EmailMessage()
+        msg["From"] = address
+        msg["To"] = recipient
+        msg["Subject"] = subject
+        msg.set_content(body)
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as s:
+            s.login(address, password)
+            s.send_message(msg)
+        speak("Email sent.")
     except Exception as e:
-        log.error(f"Email error: {e}")
-        speak("Sorry, I could not send the email. Check your app password and internet.")
+        log.error(f"Email: {e}")
+        speak("Could not send email.")
 
 
 # ==================================================
-# AI (CLAUDE)
+# AI
 # ==================================================
 
 ai_client = None
@@ -1176,274 +935,279 @@ ai_history = []
 
 def get_ai_client():
     global ai_client
-
     if ai_client is None and anthropic and os.environ.get("ANTHROPIC_API_KEY"):
         ai_client = anthropic.Anthropic()
-
     return ai_client
 
 
 def ask_ai(question):
     client = get_ai_client()
-
     if client is None:
-        speak("AI is not set up. Install the anthropic package and set the API key.")
+        speak("AI not set up.")
         return
-
     ai_history.append({"role": "user", "content": question})
-
     try:
         response = client.messages.create(
-            model=AI_MODEL,
-            max_tokens=300,
-            system=AI_SYSTEM_PROMPT,
-            messages=ai_history,
+            model=AI_MODEL, max_tokens=300, system=AI_SYSTEM_PROMPT, messages=ai_history,
         )
-
-        answer = "".join(
-            block.text for block in response.content if block.type == "text"
-        ).strip()
-
+        answer = "".join(b.text for b in response.content if b.type == "text").strip()
         if not answer:
-            raise ValueError("Empty answer")
-
+            raise ValueError("Empty")
     except Exception as e:
-        log.error(f"AI error: {e}")
+        log.error(f"AI: {e}")
         ai_history.pop()
-        speak("I could not reach the AI service right now.")
+        speak("AI not reachable.")
         return
-
     ai_history.append({"role": "assistant", "content": answer})
-
     while len(ai_history) > 12:
         del ai_history[0:2]
-
     speak(answer)
 
 
 # ==================================================
-# COMMAND HANDLER
+# COMMAND HANDLER - FLEXIBLE
 # ==================================================
 
 def handle(raw):
-    """Returns:
-        False  -> stop the assistant thread completely (real exit)
-        True   -> keep running
-    """
-
     command = raw.lower().strip()
+    print(f"[DEBUG] Command: {command}")
+    log.info(f"[DEBUG] Command: {command}")
 
-    # ---------- REAL EXIT (thread stop) ----------
-    if command in ("quit assistant", "stop assistant", "shutdown assistant") or "quit assistant" in command:
-        speak(f"Goodbye {USER_NAME}! Shutting down completely.")
+    # ============ EXIT / HELLO ============
+    if "quit assistant" in command:
+        speak(f"Goodbye {USER_NAME}!")
         return False
 
-    # ---------- EXIT (pause, but keep thread alive) ----------
-    if (
-        command in ("exit", "bye", "goodbye", "alvida", "band ho jao", "so jao")
-        or "exit" in command
-        or "alvida" in command
-    ):
-        speak(f"Theek hai {USER_NAME}, main ruk raha hoon. Jab zaroorat ho 'Hello' bolna.")
+    if command in ("exit", "bye", "goodbye"):
+        speak(f"Okay {USER_NAME}, pausing. Say Hello to resume.")
         return "exit"
 
-    # ---------- HELLO (resume) ----------
-    if (
-        command in ("hello", "hi", "namaste", "namaskar", "wake up", "utho")
-        or "hello" in command
-        or "namaste" in command
-    ):
-        speak(f"Hello {USER_NAME}! Main wapas aa gaya. Batao kya karna hai?")
+    if command in ("hello", "hi", "wake up") or command.startswith("hello"):
+        speak(f"Hello {USER_NAME}! How can I help you?")
         return "hello"
 
-    # ---------- STANDBY (deep sleep mode) ----------
-    if (
-        command in ("standby", "go to standby", "go to sleep", "sleep assistant")
-        or "stand by" in command
-    ):
+    if "standby" in command or "stand by" in command:
         standby_mode()
         return True
 
-    # ---------- CANCEL SHUTDOWN ----------
+    # ============ CANCEL SHUTDOWN ============
     if "cancel shutdown" in command or "cancel restart" in command:
         cancel_shutdown()
         return True
 
-    # ---------- ASK AI ----------
-    if re.match(r"^(?:ask ai|ask claude|ask)\s+\S", command):
-        question = re.sub(
-            r"^(?:ask ai|ask claude|ask)\s+", "", raw, flags=re.IGNORECASE
-        ).strip()
+    # ============ AI ============
+    if command.startswith("ask ai ") or command.startswith("ask claude ") or command.startswith("ask "):
+        question = re.sub(r"^ask (?:ai |claude )?", "", raw, flags=re.IGNORECASE).strip()
         ask_ai(question)
+        return True
 
-    elif "forget conversation" in command or "clear ai memory" in command:
+    if "forget conversation" in command:
         ai_history.clear()
-        speak("Okay, I cleared our AI conversation.")
+        speak("Cleared.")
+        return True
 
-    # ---------- REMINDERS / ALARMS ----------
-    elif command.startswith("remind me") or "remind" in command or "yaad" in command:
+    # ============ REMINDERS ============
+    if "remind me" in command:
         set_reminder(raw)
-
-    elif "alarm" in command and has_word(command, "set"):
+        return True
+    if "alarm" in command and ("set" in command or "for" in command):
         set_alarm(command)
-
-    elif "list reminders" in command or "list alarms" in command:
+        return True
+    if "list reminders" in command or "list alarms" in command:
         list_reminders()
-
-    elif "cancel reminders" in command or "cancel alarms" in command:
+        return True
+    if "cancel reminders" in command or "cancel alarms" in command:
         cancel_reminders()
+        return True
 
-    # ---------- EMAIL ----------
-    elif command.startswith("send email") or command.startswith("send an email") or command == "send mail":
+    # ============ EMAIL ============
+    if "send email" in command or "send an email" in command or "send mail" in command:
         send_email()
+        return True
 
-    # ---------- WHATSAPP ----------
-    elif "open whatsapp" in command and "search " in command and "message " in command:
-        whatsapp_voice_message(raw)
+    # ============ WHATSAPP ============
+    if "whatsapp" in command and "search" in command and "message" in command:
+        whatsapp_message(raw)
+        return True
 
-    # ---------- HELP ----------
-    elif "what can you do" in command or command == "help" or "madad" in command:
+    # ============ HELP ============
+    if "help" in command or "what can you do" in command:
         tell_help()
+        return True
 
-    # ---------- YOUTUBE ----------
-    elif command.startswith("search youtube "):
-        youtube_search(raw[len("search youtube "):].strip())
+    # ============ YOUTUBE ============
+    if "youtube" in command or "you tube" in command or "utube" in command:
+        if "play" in command or "song" in command or "music" in command or "search" in command:
+            query = raw.lower()
+            for w in ["open", "youtube", "you tube", "utube", "play", "song", "music",
+                      "search", "on", "the", "a", "an", "for", "please"]:
+                query = re.sub(rf"\b{w}\b", "", query, flags=re.IGNORECASE)
+            query = query.strip()
+            youtube_play(query)
+        else:
+            youtube_open()
+        return True
 
-    elif command.startswith("play ") and command.endswith(" on youtube"):
-        youtube_search(raw[len("play "):-len(" on youtube")].strip())
+    # ============ PLAY SONG (flexible) ============
+    if command.startswith("play "):
+        query = raw[5:].strip()
+        # Remove all filler words
+        query = re.sub(r"\bon youtube\b", "", query, flags=re.IGNORECASE).strip()
+        for w in ["song", "songs", "the", "a", "an", "some", "any", "random",
+                  "music", "something", "anything"]:
+            query = re.sub(rf"\b{w}\b", "", query, flags=re.IGNORECASE).strip()
+        query = " ".join(query.split())  # remove extra spaces
 
-    elif "open youtube" in command:
-        speak("Opening YouTube.")
-        webbrowser.open("https://www.youtube.com")
+        youtube_play(query)
+        return True
 
-    # ---------- GOOGLE ----------
-    elif command.startswith("search google "):
-        google_search(raw[len("search google "):].strip())
+    # ============ GOOGLE ============
+    if "google" in command:
+        if "search" in command:
+            query = raw.lower()
+            for w in ["open", "google", "search", "for", "on", "the", "a", "an", "please"]:
+                query = re.sub(rf"\b{w}\b", "", query, flags=re.IGNORECASE)
+            query = query.strip()
+            google_search(query)
+        else:
+            google_open()
+        return True
 
-    elif "open google" in command:
-        speak("Opening Google.")
-        webbrowser.open("https://www.google.com")
+    # ============ SEARCH (generic) ============
+    if "search" in command and "youtube" not in command and "google" not in command:
+        query = raw.lower()
+        for w in ["search", "for", "on", "the", "a", "an", "please"]:
+            query = re.sub(rf"\b{w}\b", "", query, flags=re.IGNORECASE)
+        query = query.strip()
+        if query:
+            google_search(query)
+        return True
 
-    # ---------- CAMERA / SCREENSHOT ----------
-    elif "open camera" in command:
+    # ============ CAMERA ============
+    if "camera" in command:
         open_camera()
+        return True
 
-    elif "take the picture" in command or "take a picture" in command or "take photo" in command or "photo" in command:
+    if "take a picture" in command or "take the picture" in command or "take photo" in command or "take a photo" in command:
         take_picture()
+        return True
 
-    elif "screenshot" in command:
+    if "screenshot" in command or "screen shot" in command:
         take_screenshot()
+        return True
 
-    # ---------- JAVA ----------
-    elif "open java folder" in command or "open folder java" in command:
+    # ============ JAVA ============
+    if "java folder" in command:
         open_java_folder()
-
-    elif command.startswith("create a file") or command.startswith("create file"):
+        return True
+    if command.startswith("create a file") or command.startswith("create file"):
         spoken = re.sub(r"^create (?:a )?file", "", command).strip()
         create_java_file(spoken)
+        return True
 
-    # ---------- TYPE ----------
-    elif command.startswith("type "):
-        type_text(raw[len("type "):].strip())
+    # ============ TYPE ============
+    if command.startswith("type "):
+        type_text(raw[5:].strip())
+        return True
 
-    # ---------- CLOSE ----------
-    elif "close all apps" in command or "all apps close" in command or "all close app" in command:
+    # ============ CLOSE ALL ============
+    if "close all" in command:
         close_all_apps()
+        return True
 
-    elif command.startswith("close "):
-        close_app(command[len("close "):].strip())
+    # ============ CLOSE APP ============
+    if command.startswith("close "):
+        app = command[6:].strip()
+        close_app(app)
+        return True
 
-    # ---------- OPEN ----------
-    elif "open settings" in command:
-        speak("Opening Settings.")
-        os.system("start ms-settings:")
-
-    elif "open file explorer" in command or "open files" in command:
-        speak("Opening File Explorer.")
-        subprocess.Popen("explorer.exe")
-
-    elif "open cmd" in command or "open command prompt" in command:
-        speak("Opening Command Prompt.")
-        subprocess.Popen("cmd.exe", creationflags=subprocess.CREATE_NEW_CONSOLE)
-
-    elif "open whatsapp" in command:
-        open_whatsapp()
-
-    elif command.startswith("open "):
-        app = command[len("open "):].strip()
+    # ============ OPEN APP (flexible) ============
+    if command.startswith("open ") or command.startswith("launch ") or command.startswith("start "):
+        for prefix in ("open ", "launch ", "start "):
+            if command.startswith(prefix):
+                app = command[len(prefix):].strip()
+                break
         if app:
             open_app(app)
+        else:
+            speak("What should I open?")
+        return True
 
-    # ---------- POWER ----------
-    elif command in ("laptop shutdown", "shutdown laptop", "shut down laptop"):
+    # ============ POWER ============
+    if "shutdown" in command or "shut down" in command:
         shutdown_laptop()
-
-    elif command in ("restart", "restart laptop", "laptop restart"):
+        return True
+    if "restart" in command:
         restart_laptop()
-
-    elif command in ("laptop sleep", "sleep laptop"):
+        return True
+    if "sleep" in command and "laptop" in command:
         sleep_laptop()
+        return True
 
-    # ---------- VOLUME ----------
-    elif "volume up" in command or "increase volume" in command:
+    # ============ VOLUME ============
+    if "volume up" in command or "increase volume" in command:
         change_volume("up")
-
-    elif "volume down" in command or "decrease volume" in command:
+        return True
+    if "volume down" in command or "decrease volume" in command:
         change_volume("down")
-
-    elif command in ("mute", "volume mute", "mute volume"):
+        return True
+    if command == "mute" or "mute volume" in command:
         change_volume("mute")
+        return True
 
-    # ---------- NOTES ----------
-    elif command.startswith("take a note ") or command.startswith("note ") or command.startswith("likho "):
-        text = re.sub(r"^(?:take a note|note|likho)\s+", "", raw, flags=re.IGNORECASE).strip()
+    # ============ NOTES ============
+    if command.startswith("note ") or command.startswith("take a note "):
+        text = re.sub(r"^(?:take a note|note)\s+", "", raw, flags=re.IGNORECASE).strip()
         save_note(text)
-
-    elif "read my notes" in command or "read notes" in command:
+        return True
+    if "read notes" in command or "read my notes" in command:
         read_notes()
+        return True
 
-    # ---------- WEATHER ----------
-    elif has_word(command, "weather", "temperature") or "mausam" in command:
+    # ============ WEATHER ============
+    if "weather" in command or "temperature" in command:
         match = re.search(r"(?:in|of|for)\s+([a-z ]+)$", command)
         get_weather(match.group(1) if match else "")
+        return True
 
-    # ---------- WIKIPEDIA ----------
-    elif command.startswith("wikipedia "):
-        wikipedia_answer(raw[len("wikipedia "):])
+    # ============ WIKIPEDIA ============
+    if command.startswith("wikipedia "):
+        wikipedia_answer(raw[10:])
+        return True
+    if command.startswith("tell me about "):
+        wikipedia_answer(raw[14:])
+        return True
+    if command.startswith("who is "):
+        wikipedia_answer(raw[7:])
+        return True
 
-    elif command.startswith("tell me about "):
-        wikipedia_answer(raw[len("tell me about "):])
-
-    elif command.startswith("who is "):
-        wikipedia_answer(raw[len("who is "):])
-
-    # ---------- JOKE ----------
-    elif "joke" in command or "chutkula" in command:
+    # ============ JOKE ============
+    if "joke" in command:
         speak(random.choice(JOKES))
+        return True
 
-    # ---------- TIME / DATE ----------
-    elif has_word(command, "time") and len(command.split()) <= 6:
-        speak("The time is " + datetime.datetime.now().strftime("%I:%M %p"))
+    # ============ TIME / DATE ============
+    if "time" in command and len(command.split()) <= 6:
+        speak("Time is " + datetime.datetime.now().strftime("%I:%M %p"))
+        return True
+    if "date" in command and len(command.split()) <= 6:
+        speak("Date is " + datetime.datetime.now().strftime("%d %B %Y"))
+        return True
 
-    elif has_word(command, "date") and len(command.split()) <= 6:
-        speak("Today's date is " + datetime.datetime.now().strftime("%d %B %Y"))
-
-    # ---------- UNKNOWN -> AI ----------
+    # ============ UNKNOWN ============
+    if AI_FALLBACK and get_ai_client():
+        ask_ai(raw)
     else:
-        if AI_FALLBACK and get_ai_client():
-            ask_ai(raw)
-        else:
-            speak(f"Sorry {USER_NAME}, I don't know that command yet.")
+        speak(f"Sorry {USER_NAME}, I don't know that command.")
 
     return True
 
 
 # ==================================================
-# GUI (TKINTER) - Badi window
+# GUI
 # ==================================================
 
 def build_gui():
-    """Creates the GUI window. Returns the root window."""
     global gui_window, gui_log_box, gui_status_label
 
     gui_window = tk.Tk()
@@ -1516,7 +1280,7 @@ def build_gui():
 
     footer = tk.Label(
         gui_window,
-        text="Wake word: 'Hey Assistant'   |   Say 'Hello' to wake, 'Exit' to pause",
+        text="Say 'Help' for commands  |  'Exit' to pause  |  'Hello' to resume",
         font=("Segoe UI", 10),
         bg="#1e1e2e",
         fg="#6c7086",
@@ -1530,10 +1294,8 @@ def build_gui():
 
 
 def gui_log(speaker, text):
-    """Appends a message to the GUI conversation box."""
     if gui_log_box is None:
         return
-
     gui_log_box.config(state=tk.NORMAL)
     prefix = {"user": "You: ", "assistant": "Assistant: ", "system": "- "}[speaker]
     gui_log_box.insert(tk.END, prefix + text + "\n", speaker)
@@ -1562,10 +1324,7 @@ standby_event = threading.Event()
 
 
 def assistant_loop():
-    """Main assistant loop. Runs in a background thread."""
     global assistant_running, assistant_active
-
-    set_hindi_voice()
 
     speak(f"Hello {USER_NAME}, I am your personal voice assistant. How can I help you?")
     set_gui_status("Listening...", "#a6e3a1")
@@ -1574,7 +1333,6 @@ def assistant_loop():
         try:
             check_reminders()
 
-            # If paused (user said "exit"), wait quietly for "hello"
             if not assistant_active:
                 set_gui_status("Paused - say 'Hello' to wake", "#f9e2af")
                 time.sleep(1)
@@ -1597,18 +1355,15 @@ def assistant_loop():
 
             result = handle(raw)
 
-            # Handle special return values
             if result is False:
                 assistant_running = False
                 break
             elif result == "exit":
-                # Pause the assistant, but keep thread alive
                 assistant_active = False
                 set_gui_status("Paused - say 'Hello' to wake", "#f9e2af")
                 gui_log("system", "Assistant paused. Say 'Hello' to resume.")
                 continue
             elif result == "hello":
-                # Resume the assistant
                 assistant_active = True
                 set_gui_status("Listening...", "#a6e3a1")
                 gui_log("system", "Assistant resumed.")
@@ -1628,7 +1383,6 @@ def assistant_loop():
 
 
 def start_assistant():
-    """Starts the assistant thread if not already running."""
     global assistant_thread, assistant_running, assistant_active
 
     if assistant_thread and assistant_thread.is_alive():
@@ -1644,14 +1398,12 @@ def start_assistant():
 
 
 def go_standby():
-    """Puts the assistant into standby mode."""
     standby_event.set()
     gui_log("system", "Standby mode. Say 'Hey Assistant' to wake up.")
     set_gui_status("Standby", "#f9e2af")
 
 
 def stop_assistant():
-    """Stops the assistant thread."""
     global assistant_running, assistant_active
     assistant_running = False
     assistant_active = False
@@ -1661,7 +1413,6 @@ def stop_assistant():
 
 
 def on_gui_close():
-    """Called when the user closes the GUI window."""
     global assistant_running
     assistant_running = False
     if gui_window:
@@ -1669,7 +1420,6 @@ def on_gui_close():
 
 
 def process_gui_queue():
-    """Periodically moves messages from queue to GUI."""
     while not gui_queue.empty():
         speaker, text = gui_queue.get()
         gui_log(speaker, text)
@@ -1691,7 +1441,6 @@ def main():
         gui_window.mainloop()
     else:
         log.info("GUI not available. Running in console mode.")
-        set_hindi_voice()
         try:
             assistant_loop()
         except KeyboardInterrupt:
